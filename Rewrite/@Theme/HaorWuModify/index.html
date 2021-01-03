@@ -6,8 +6,7 @@
     <meta name="renderer" content="webkit">
     <meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1,viewport-fit=cover">
     <title>storage - /</title>
-    <link href="//cdn-8011.iprte.com/mdui/0.4.2/css/mdui.min.css" rel="stylesheet">
-    <link href="//cdn-8011.iprte.com/dplayer/1.25.0/DPlayer.min.css" rel="stylesheet">
+    <link href="//cdn.alfyn.me/mdui/0.4.2/css/mdui.min.css" rel="stylesheet">
     <style>
         body {
             background-color: #f2f5fa
@@ -231,11 +230,19 @@
             <div id="file-list"></div>
         </div>
     </div>
+    <div class="mdui-dialog" id="dialog">
+        <div class="mdui-dialog-title">请粘贴此链接至potplayer等播放器</div>
+        <div class="mdui-dialog-content" id="dialog_content"></div>
+        <div class="mdui-dialog-actions">
+            <button class="mdui-btn mdui-ripple" mdui-dialog-cancel>关闭</button>
+        </div>
+    </div>
 </div>
-<script src="//cdn-8011.iprte.com/mdui/0.4.2/js/mdui.min.js"></script>
-<script src="//cdn-8011.iprte.com/dplayer/1.25.0/DPlayer.min.js"></script>
-<script src="//cdn-8011.iprte.com/cplayer/3.2.2/cplayer.js"></script>
+<script src="//cdn.alfyn.me/mdui/0.4.2/js/mdui.min.js"></script>
+<script src="//cdn.alfyn.me/cplayer/3.2.2/cplayer.js"></script>
+<script src="//cdn.alfyn.me/jquery/3.5.0/jquery.min.js"></script>
 <script>
+    let musicPage = false;
     let domain = window.location.host,
         rootPath = "{{.RootPath}}",
         currentPath = "{{.CurrentPath}}",
@@ -249,14 +256,17 @@
         pageData = JSON.parse(window.atob(rawData)),
         arrayPath = [],
         arrayFloder = [],
-        arryVideo = [],
+        arrayVideo = [],
         arrayFile = [];
     for (let item in pageData) {
         if (item.indexOf("@") === 0) {
             continue
         }
-        if (getFileType(decodeURIComponent(pageData[item]['name'])) === "video") {
-            arryVideo.push(decodeURIComponent(pageData[item]['name']))
+        let fileType = getFileType(decodeURIComponent(pageData[item]['name']));
+        if (fileType === "video") {
+            arrayVideo.push(decodeURIComponent(pageData[item]['name']))
+        } else if (fileType === "music") {
+            musicPage = true;
         }
         if (pageData[item]['@type'] === 'file') {
             arrayFile.push(pageData[item])
@@ -265,13 +275,26 @@
         }
     }
 
-    playlistID = {};
-    let player = new cplayer({
-        element: document.getElementById('app'),
-        zoomOutKana: true,
-        showPlaylistButton: false,
-        playlist: []
-    });
+    player = null;
+    if (musicPage) {
+        playlistID = {};
+        titleFlag = true;
+        var timer = setInterval(function () {
+            if (titleFlag) {
+                if (player.played) {
+                    document.title = "Playing: "
+                } else {
+                    document.title = "Pause: "
+                }
+                document.title += player.nowplay["name"];
+                titleFlag = false;
+            } else {
+                document.title = title;
+                titleFlag = true;
+            }
+        }, 2000);
+    }
+
 
     function goto(thePath) {
         window.location.href = thePath
@@ -352,6 +375,7 @@
         nav.appendChild(pathSpan);
         navText = (nav.innerHTML.length === 0) ? '/' : pathSpan.innerHTML.replace(/<[^>]+>/g, "");
         document.title += navText.substr(1);
+        title = document.title;
         arrayPath = locArray
     }
 
@@ -376,6 +400,22 @@
     }
 
     function view(Property) {
+        if (musicPage) {
+            if (player != null) {
+                player.destroy();
+            }
+            player = new cplayer({
+                element: document.getElementById('app'),
+                zoomOutKana: true,
+                showPlaylistButton: false,
+                volume: 0.5,
+                playlist: []
+            });
+            for (let key in playlistID) {
+                delete playlistID[key];
+            }
+        }
+        var video_url = new mdui.Dialog('#dialog');
         arrayFloder.sort(compare(Property));
         arrayFile.sort(compare(Property));
         if (reverse) {
@@ -419,16 +459,14 @@
             }
             newChild.addEventListener('click', function (e) {
                 if (fileType === "video") {
-                    let dplayerContainer = `
-                        <div id="dplayerContainer" class="mdui-container-fluid">
-                            <div align="right">
-                                <button type="button" id="closevideo" onclick="dpClose()" class="mdui-textfield-close mdui-btn mdui-btn-icon"><i class="mdui-icon material-icons close-icon">close</i></button>
-                            </div>
-                            <div id="dplayer"></div>
-                        </div>`;
-                    $$('#dplayerContainer').remove();
-                    $$(newChild).after(dplayerContainer);
-                    dpOpen(href)
+                    let aux = document.createElement("input"); 
+                    aux.setAttribute("value", href); 
+                    document.body.appendChild(aux); 
+                    aux.select();
+                    document.execCommand("copy"); 
+                    document.body.removeChild(aux);
+                    document.getElementById("dialog_content").innerText = href;
+                    video_url.open()
                 } else if (fileType === "image") {
                     let imgEle = `
                         <div id="viewerContainer" onclick="$$(this).remove()">
@@ -440,7 +478,7 @@
                     $$(newChild).after(imgEle)
                 } else if (fileType === "music") {
                     player.to(playlistID[itemName]);
-                    if (player.paused){
+                    if (player.paused) {
                         player.play();
                     }
                 } else {
@@ -493,28 +531,10 @@
         return icon
     }
 
-    function dpClose() {
-        $$('#dplayerContainer').remove();
-        if (dp) {
-            dp.destroy()
-        }
-    }
-
-    function dpOpen(link) {
-        $$('#dplayerContainer').show();
-        dp = new DPlayer({
-            container: document.getElementById('dplayer'),
-            autoplay: true,
-            video: {
-                url: link,
-            },
-        })
-    }
-
     $$('#btn').on('click', function (event) {
         event.preventDefault();
         $$('#text-input').show();
-        $$('#close').show()
+        $$('#close').show();
         $$('#btn').hide()
     });
     $$('#close').on('click', function (event) {
