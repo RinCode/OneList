@@ -1,12 +1,13 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge, Chrome=1">
-    <meta name="renderer" content="webkit">
-    <meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1,viewport-fit=cover">
+    <meta charset="UTF-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge, Chrome=1"/>
+    <meta name="renderer" content="webkit"/>
+    <meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1,viewport-fit=cover"/>
     <title>storage - /</title>
-    <link href="//cdn.alfyn.me/mdui/0.4.2/css/mdui.min.css" rel="stylesheet">
+    <link href="//cdn.alfyn.me/mdui/0.4.2/css/mdui.min.css" rel="stylesheet"/>
+    <link href="//cdn.alfyn.me/dplayer/1.25.0/DPlayer.min.css" rel="stylesheet">
     <style>
         body {
             background-color: #f2f5fa
@@ -201,7 +202,7 @@
     </style>
 </head>
 <body>
-<div id="float_player" hidden style="z-index: 9999; position: fixed ! important; right: 60px; top: 70px;">
+<div id="float_player" hidden="" style="z-index: 9999; position: fixed ! important; right: 60px; top: 70px;">
     <div id="app"></div>
 </div>
 <div class="container mdui-container">
@@ -211,7 +212,8 @@
                onclick="goto(rootPath)">home</i>
             <span id="path">/</span>
             <div class="mdui-toolbar-spacer"></div>
-            <input type="text" id="text-input" class="mdui-textfield-input" oninput="search(this)" placeholder="请输入关键字">
+            <input type="text" id="text-input" class="mdui-textfield-input" oninput="search(this)"
+                   placeholder="请输入关键字"/>
             <button type="button" id="close" class="mdui-textfield-close mdui-btn mdui-btn-icon"><i
                     class="mdui-icon material-icons">close</i></button>
             <button type="button" id="btn" class="mdui-textfield-icon mdui-btn mdui-btn-icon"><i
@@ -230,17 +232,11 @@
             <div id="file-list"></div>
         </div>
     </div>
-    <div class="mdui-dialog" id="dialog">
-        <div class="mdui-dialog-title">请粘贴此链接至potplayer等播放器</div>
-        <div class="mdui-dialog-content" id="dialog_content"></div>
-        <div class="mdui-dialog-actions">
-            <button class="mdui-btn mdui-ripple" mdui-dialog-cancel>关闭</button>
-        </div>
-    </div>
 </div>
 <script src="//cdn.alfyn.me/mdui/0.4.2/js/mdui.min.js"></script>
 <script src="//cdn.alfyn.me/cplayer/3.2.2/cplayer.js"></script>
 <script src="//cdn.alfyn.me/jquery/3.5.0/jquery.min.js"></script>
+<script src="//cdn.alfyn.me/dplayer/1.25.0/DPlayer.min.js"></script>
 <script>
     let musicPage = false;
     let domain = window.location.host,
@@ -256,7 +252,7 @@
         pageData = JSON.parse(window.atob(rawData)),
         arrayPath = [],
         arrayFloder = [],
-        arrayVideo = [],
+        arryVideo = [],
         arrayFile = [];
     for (let item in pageData) {
         if (item.indexOf("@") === 0) {
@@ -264,7 +260,7 @@
         }
         let fileType = getFileType(decodeURIComponent(pageData[item]['name']));
         if (fileType === "video") {
-            arrayVideo.push(decodeURIComponent(pageData[item]['name']))
+            arryVideo.push(decodeURIComponent(pageData[item]['name']))
         } else if (fileType === "music") {
             musicPage = true;
         }
@@ -275,18 +271,18 @@
         }
     }
 
-    player = null;
+    musicPlayer = null;
     if (musicPage) {
         playlistID = {};
         titleFlag = true;
         var timer = setInterval(function () {
             if (titleFlag) {
-                if (player.played) {
+                if (musicPlayer.played) {
                     document.title = "Playing: "
                 } else {
                     document.title = "Pause: "
                 }
-                document.title += player.nowplay["name"];
+                document.title += musicPlayer.nowplay["name"];
                 titleFlag = false;
             } else {
                 document.title = title;
@@ -401,10 +397,10 @@
 
     function view(Property) {
         if (musicPage) {
-            if (player != null) {
-                player.destroy();
+            if (musicPlayer != null) {
+                musicPlayer.destroy();
             }
-            player = new cplayer({
+            musicPlayer = new cplayer({
                 element: document.getElementById('app'),
                 zoomOutKana: true,
                 showPlaylistButton: false,
@@ -415,7 +411,6 @@
                 delete playlistID[key];
             }
         }
-        var video_url = new mdui.Dialog('#dialog');
         arrayFloder.sort(compare(Property));
         arrayFile.sort(compare(Property));
         if (reverse) {
@@ -455,18 +450,45 @@
                 music["name"] = itemName;
                 playlistID[itemName] = count;
                 count++;
-                player.add(music)
+                musicPlayer.add(music)
             }
             newChild.addEventListener('click', function (e) {
                 if (fileType === "video") {
-                    let aux = document.createElement("input"); 
-                    aux.setAttribute("value", href); 
-                    document.body.appendChild(aux); 
-                    aux.select();
-                    document.execCommand("copy"); 
-                    document.body.removeChild(aux);
-                    document.getElementById("dialog_content").innerText = href;
-                    video_url.open()
+                    mdui.dialog({
+                        title: '播放选择',
+                        content: '注意，在线播放可能无法成功播放部分格式。',
+                        stackedButtons: true,
+                        buttons: [
+                            {
+                                text: '播放器播放',
+                                onClick: function (inst) {
+                                    autoPaste(encodeURI(href));
+                                    close();
+                                }
+                            },
+                            {
+                                text: '在线播放',
+                                onClick: function (inst) {
+                                    let dplayerContainer = `
+                                        <div id="dplayerContainer" class="mdui-container-fluid">
+                                            <div align="right">
+                                                <button type="button" id="closevideo" onclick="dpClose()" class="mdui-textfield-close mdui-btn mdui-btn-icon"><i class="mdui-icon material-icons close-icon">close</i></button>
+                                            </div>
+                                            <div id="dplayer"></div>
+                                        </div>`;
+                                    $$('#dplayerContainer').remove();
+                                    $$(newChild).after(dplayerContainer);
+                                    dpOpen(href);
+                                    close();
+                                }
+                            }, {
+                                text: '取消',
+                                onClick: function (inst) {
+                                    close();
+                                }
+                            },
+                        ]
+                    });
                 } else if (fileType === "image") {
                     let imgEle = `
                         <div id="viewerContainer" onclick="$$(this).remove()">
@@ -477,9 +499,9 @@
                     $$('#viewerContainer').remove();
                     $$(newChild).after(imgEle)
                 } else if (fileType === "music") {
-                    player.to(playlistID[itemName]);
-                    if (player.paused) {
-                        player.play();
+                    musicPlayer.to(playlistID[itemName]);
+                    if (musicPlayer.paused) {
+                        musicPlayer.play();
                     }
                 } else {
                     window.location.href = href
@@ -529,6 +551,45 @@
                 break;
         }
         return icon
+    }
+
+    function dpClose() {
+        $$('#dplayerContainer').remove();
+        if (dp) {
+            dp.destroy()
+        }
+    }
+
+    function dpOpen(link) {
+        $$('#dplayerContainer').show();
+        dp = new DPlayer({
+            container: document.getElementById('dplayer'),
+            autoplay: true,
+            video: {
+                url: link,
+            },
+        })
+    }
+
+    function autoPaste(content) {
+        document.designMode = 'on';
+        let bool = document.execCommand('copy');
+        let tips;
+        if (!bool) {
+            tips = "请粘贴此链接至VLC等播放器";
+        } else {
+            const input = document.createElement('input');
+            input.setAttribute('readonly', 'readonly');
+            input.setAttribute('value', content);
+            document.body.appendChild(input);
+            input.setSelectionRange(0, content.length);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            tips = "(已自动复制)请粘贴此链接至VLC等播放器";
+        }
+        window.prompt(tips, content);
+        document.designMode = 'off'
     }
 
     $$('#btn').on('click', function (event) {
